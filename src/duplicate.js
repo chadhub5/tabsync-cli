@@ -2,21 +2,19 @@ const { loadSession, saveSession } = require('./session');
 
 /**
  * Duplicate an existing session under a new name.
- * Optionally override the title of each tab.
+ * Optionally append a suffix to all tab titles.
  */
 async function duplicateSession(sourceName, destName, options = {}) {
-  if (!sourceName || !destName) {
-    throw new Error('sourceName and destName are required');
-  }
+  const { titleSuffix = '' } = options;
 
   const source = await loadSession(sourceName);
   if (!source) {
-    throw new Error(`Session "${sourceName}" not found`);
+    throw new Error(`Session "${sourceName}" not found.`);
   }
 
   const tabs = source.tabs.map((tab) => ({
     ...tab,
-    ...(options.titlePrefix ? { title: `${options.titlePrefix} ${tab.title}` } : {}),
+    title: titleSuffix ? `${tab.title}${titleSuffix}` : tab.title,
   }));
 
   const duplicate = {
@@ -31,20 +29,12 @@ async function duplicateSession(sourceName, destName, options = {}) {
 }
 
 /**
- * Duplicate a session and append a numeric suffix if destName already exists.
+ * Clone a session with an auto-generated name based on the source.
  */
-async function safeDuplicate(sourceName, destName, { listSessions, ...options } = {}) {
-  const sessions = listSessions ? await listSessions() : [];
-  const existing = new Set(sessions.map((s) => s.name || s));
-
-  let finalName = destName;
-  let counter = 1;
-  while (existing.has(finalName)) {
-    finalName = `${destName}-${counter}`;
-    counter++;
-  }
-
-  return duplicateSession(sourceName, finalName, options);
+async function cloneSession(sourceName, options = {}) {
+  const timestamp = Date.now();
+  const destName = options.destName || `${sourceName}-copy-${timestamp}`;
+  return duplicateSession(sourceName, destName, options);
 }
 
-module.exports = { duplicateSession, safeDuplicate };
+module.exports = { duplicateSession, cloneSession };
