@@ -36,6 +36,11 @@ test('exits on missing base name', async () => {
   expect(exitSpy).toHaveBeenCalledWith(1);
 });
 
+test('exits on missing target name', async () => {
+  await expect(handleMerge('work', null)).rejects.toThrow('exit');
+  expect(exitSpy).toHaveBeenCalledWith(1);
+});
+
 test('exits on invalid strategy', async () => {
   await expect(handleMerge('work', 'home', { strategy: 'bad' })).rejects.toThrow('exit');
   expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('Invalid strategy'));
