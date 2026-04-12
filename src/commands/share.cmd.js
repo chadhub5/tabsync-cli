@@ -16,13 +16,29 @@ function handleShareCreate(sessionName, opts) {
 
 function handleShareImport(code, opts) {
   const targetName = opts.name;
-  const payload = resolveShare(code);
+
+  let payload;
+  try {
+    payload = resolveShare(code);
+  } catch (err) {
+    console.error(`Error resolving share code: ${err.message}`);
+    process.exit(1);
+  }
+
   if (!payload) {
     console.error(`Error: No shared session found for code "${code}"`);
     process.exit(1);
   }
+
   const importName = targetName || payload.sessionName;
-  saveSession(importName, payload.session);
+
+  try {
+    saveSession(importName, payload.session);
+  } catch (err) {
+    console.error(`Error saving session: ${err.message}`);
+    process.exit(1);
+  }
+
   console.log(`Imported shared session as "${importName}" (${payload.session.tabs.length} tab(s))`);
 }
 
