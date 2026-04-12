@@ -46,11 +46,30 @@ function isFavorite(sessionName) {
   return favorites.includes(sessionName);
 }
 
+/**
+ * Renames a favorite session entry. Useful when a session is renamed
+ * and the favorites list needs to stay in sync.
+ */
+function renameFavorite(oldName, newName) {
+  const favorites = loadFavorites();
+  const index = favorites.indexOf(oldName);
+  if (index === -1) {
+    throw new Error(`Session '${oldName}' is not a favorite`);
+  }
+  if (favorites.includes(newName)) {
+    throw new Error(`Session '${newName}' is already a favorite`);
+  }
+  favorites[index] = newName;
+  saveFavorites(favorites);
+  return favorites;
+}
+
 module.exports = {
   ensureFavoritesFile,
   loadFavorites,
   saveFavorites,
   addFavorite,
   removeFavorite,
-  isFavorite
+  isFavorite,
+  renameFavorite
 };
