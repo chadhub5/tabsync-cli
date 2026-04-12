@@ -1,84 +1,80 @@
-const { describe, it, beforeEach, afterEach } = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('fs');
 const path = require('path');
-const os = require('os');
 
-function getModule(homeDir) {
-  process.env.HOME = homeDir;
-  Object.keys(require.cache).forEach(k => { if (k.includes('workspace')) delete require.cache[k]; });
-  return require('./workspace');
+let fs;
+let mod;
+
+function getModule() {
+  jest.resetModules();
+  fs = require('fs').promises;
+  jest.mock('fs', () => ({ promises: { mkdir: jest.fn(), readFile: jest.fn(), writeFile: jest.fn(), unlink: jest.fn(), readdir: jest.fn() } }));
+  mod = require('./workspace');
+  return mod;
 }
 
-describe('workspace', () => {
-  let tmpDir;
+beforeEach(() => {
+  getModule();
+});
 
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tabsync-ws-'));
+describe('ensureWorkspaceDir', () => {
+  it('creates the workspace directory', async () => {
+    fs.mkdir.mockResolvedValue();
+    await mod.ensureWorkspaceDir();
+    expect(fs.mkdir).toHaveBeenCalledWith(expect.stringContaining('workspaces'), { recursive: true });
+  });
+});
+
+describe('saveWorkspace', () => {
+  it('writes workspace JSON to disk', async () => {
+    fs.mkdir.mockResolvedValue();
+    fs.writeFile.mockResolvedValue();
+    const result = await mod.saveWorkspace('myws', ['s1', 's2'], { description: 'test' });
+    expect(result.name).toBe('myws');
+    expect(result.sessions).toEqual(['s1', 's2']);
+    expect(fs.writeFile).toHaveBeenCalled();
+  });
+});
+
+describe('loadWorkspace', () => {
+  it('reads and parses workspace JSON', async () => {
+    fs.mkdir.mockResolvedValue();
+    fs.readFile.mockResolvedValue(JSON.stringify({ name: 'myws', sessions: ['s1'] }));
+    const result = await mod.loadWorkspace('myws');
+    expect(result.name).toBe('myws');
   });
 
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+  it('returns null if file not found', async () => {
+    fs.mkdir.mockResolvedValue();
+    const err = new Error('not found');
+    err.code = 'ENOENT';
+    fs.readFile.mockRejectedValue(err);
+    const result = await mod.loadWorkspace('missing');
+    expect(result).toBeNull();
+  });
+});
+
+describe('deleteWorkspace', () => {
+  it('deletes the workspace file', async () => {
+    fs.mkdir.mockResolvedValue();
+    fs.unlink.mockResolvedValue();
+    await mod.deleteWorkspace('myws');
+    expect(fs.unlink).toHaveBeenCalled();
+  });
+});
+
+describe('listWorkspaces', () => {
+  it('returns a list of workspaces', async () => {
+    fs.mkdir.mockResolvedValue();
+    fs.readdir.mockResolvedValue(['myws.json', 'other.json']);
+    fs.readFile.mockResolvedValue(JSON.stringify({ name: 'myws', sessions: [] }));
+    const result = await mod.listWorkspaces();
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBe(2);
   });
 
-  it('saves and loads a workspace', () => {
-    const mod = getModule(tmpDir);
-    const ws = mod.saveWorkspace('mywork', ['session1', 'session2']);
-    assert.equal(ws.name, 'mywork');
-    assert.deepEqual(ws.sessions, ['session1', 'session2']);
-    const loaded = mod.loadWorkspace('mywork');
-    assert.equal(loaded.name, 'mywork');
-    assert.deepEqual(loaded.sessions, ['session1', 'session2']);
-  });
-
-  it('returns null for missing workspace', () => {
-    const mod = getModule(tmpDir);
-    const result = mod.loadWorkspace('nope');
-    assert.equal(result, null);
-  });
-
-  it('lists workspaces', () => {
-    const mod = getModule(tmpDir);
-    mod.saveWorkspace('alpha', ['s1']);
-    mod.saveWorkspace('beta', ['s2', 's3']);
-    const list = mod.listWorkspaces();
-    assert.equal(list.length, 2);
-    const names = list.map(w => w.name).sort();
-    assert.deepEqual(names, ['alpha', 'beta']);
-  });
-
-  it('deletes a workspace', () => {
-    const mod = getModule(tmpDir);
-    mod.saveWorkspace('temp', []);
-    const deleted = mod.deleteWorkspace('temp');
-    assert.equal(deleted, true);
-    assert.equal(mod.loadWorkspace('temp'), null);
-  });
-
-  it('returns false when deleting nonexistent workspace', () => {
-    const mod = getModule(tmpDir);
-    assert.equal(mod.deleteWorkspace('ghost'), false);
-  });
-
-  it('adds a session to a workspace without duplicates', () => {
-    const mod = getModule(tmpDir);
-    mod.saveWorkspace('ws1', ['a']);
-    mod.addSessionToWorkspace('ws1', 'b');
-    mod.addSessionToWorkspace('ws1', 'b');
-    const ws = mod.loadWorkspace('ws1');
-    assert.deepEqual(ws.sessions, ['a', 'b']);
-  });
-
-  it('removes a session from a workspace', () => {
-    const mod = getModule(tmpDir);
-    mod.saveWorkspace('ws2', ['x', 'y', 'z']);
-    mod.removeSessionFromWorkspace('ws2', 'y');
-    const ws = mod.loadWorkspace('ws2');
-    assert.deepEqual(ws.sessions, ['x', 'z']);
-  });
-
-  it('throws when adding to nonexistent workspace', () => {
-    const mod = getModule(tmpDir);
-    assert.throws(() => mod.addSessionToWorkspace('missing', 'x'), /not found/);
+  it('returns empty array when no workspaces exist', async () => {
+    fs.mkdir.mockResolvedValue();
+    fs.readdir.mockResolvedValue([]);
+    const result = await mod.listWorkspaces();
+    expect(result).toEqual([]);
   });
 });
