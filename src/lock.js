@@ -58,4 +58,21 @@ function listLocks() {
     });
 }
 
-module.exports = { ensureLockDir, getLockPath, lockSession, unlockSession, getLockInfo, listLocks };
+/**
+ * Checks if a lock is stale by comparing the locking process's PID.
+ * If the PID no longer exists on this machine, the lock is considered stale.
+ */
+function isLockStale(sessionName) {
+  const info = getLockInfo(sessionName);
+  if (!info) return false;
+  // Only check staleness if the lock was created on this same host
+  if (info.by !== os.hostname()) return false;
+  try {
+    process.kill(info.pid, 0);
+    return false;
+  } catch (e) {
+    return true;
+  }
+}
+
+module.exports = { ensureLockDir, getLockPath, lockSession, unlockSession, getLockInfo, listLocks, isLockStale };
