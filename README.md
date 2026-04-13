@@ -21,6 +21,9 @@ tabsync save --browser chrome --output my-session.json
 # Restore tabs from a saved session
 tabsync restore my-session.json
 
+# List all locally saved sessions
+tabsync list
+
 # Share a session by pushing it to a remote endpoint
 tabsync push my-session.json --url https://your-sync-server.com/sessions
 
