@@ -1,5 +1,14 @@
 const { duplicateSession, cloneSession } = require('../duplicate');
 
+/**
+ * Handles the duplicate/clone logic for sessions.
+ * If destName is provided, duplicates with that name; otherwise clones with an auto-generated name.
+ *
+ * @param {string} sourceName - Name of the session to duplicate.
+ * @param {string} [destName] - Optional name for the new session.
+ * @param {object} [options] - Additional options (e.g. titleSuffix).
+ * @returns {Promise<object>} The newly created session.
+ */
 async function handleDuplicate(sourceName, destName, options = {}) {
   if (!sourceName) {
     console.error('Error: source session name is required.');
@@ -17,7 +26,13 @@ async function handleDuplicate(sourceName, destName, options = {}) {
     }
     return result;
   } catch (err) {
-    console.error(`Error: ${err.message}`);
+    if (err.code === 'SESSION_NOT_FOUND') {
+      console.error(`Error: Session "${sourceName}" does not exist.`);
+    } else if (err.code === 'SESSION_ALREADY_EXISTS') {
+      console.error(`Error: A session named "${destName}" already exists.`);
+    } else {
+      console.error(`Error: ${err.message}`);
+    }
     process.exit(1);
   }
 }
