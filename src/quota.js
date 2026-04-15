@@ -3,17 +3,10 @@ const path = require('path');
 
 const QUOTA_FILE = path.join(process.env.HOME || '.', '.tabsync', 'quota.json');
 
-const DEFAULT_LIMITS = {
-  maxSessions: 100,
-  maxTabsPerSession: 500,
-  maxStorageMB: 50
-};
-
 function ensureQuotaFile() {
-  if (!fs.existsSync(QUOTA_FILE)) {
-    fs.mkdirSync(path.dirname(QUOTA_FILE), { recursive: true });
-    fs.writeFileSync(QUOTA_FILE, JSON.stringify({ limits: DEFAULT_LIMITS, usage: {} }, null, 2));
-  }
+  const dir = path.dirname(QUOTA_FILE);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(QUOTA_FILE)) fs.writeFileSync(QUOTA_FILE, JSON.stringify({ limits: {}, usage: {} }));
 }
 
 function loadQuota() {
@@ -26,46 +19,44 @@ function saveQuota(data) {
   fs.writeFileSync(QUOTA_FILE, JSON.stringify(data, null, 2));
 }
 
-function setLimit(key, value) {
-  if (!Object.keys(DEFAULT_LIMITS).includes(key)) {
-    throw new Error(`Unknown quota key: ${key}`);
-  }
+function setLimit(resource, limit) {
   const data = loadQuota();
-  data.limits[key] = Number(value);
+  data.limits[resource] = limit;
   saveQuota(data);
-  return data.limits;
 }
 
 function getLimits() {
   return loadQuota().limits;
 }
 
-function checkQuota(key, current) {
-  const { limits } = loadQuota();
-  if (!(key in limits)) return { ok: true };
-  const limit = limits[key];
+function getUsage() {
+  return loadQuota().usage;
+}
+
+function updateUsage(resource, count) {
+  const data = loadQuota();
+  data.usage[resource] = count;
+  saveQuota(data);
+}
+
+function checkQuota(resource, requested = 1) {
+  const data = loadQuota();
+  const limit = data.limits[resource];
+  if (limit === undefined) return { allowed: true, limit: null, usage: data.usage[resource] || 0 };
+  const current = data.usage[resource] || 0;
   return {
-    ok: current < limit,
-    current,
+    allowed: current + requested <= limit,
     limit,
-    percent: Math.round((current / limit) * 100)
+    usage: current,
+    remaining: limit - current
   };
 }
 
-function resetLimits() {
+function removeLimit(resource) {
   const data = loadQuota();
-  data.limits = { ...DEFAULT_LIMITS };
+  delete data.limits[resource];
+  delete data.usage[resource];
   saveQuota(data);
-  return data.limits;
 }
 
-module.exports = {
-  ensureQuotaFile,
-  loadQuota,
-  saveQuota,
-  setLimit,
-  getLimits,
-  checkQuota,
-  resetLimits,
-  DEFAULT_LIMITS
-};
+module.exports = { ensureQuotaFile, loadQuota, saveQuota, setLimit, getLimits, getUsage, updateUsage, checkQuota, removeLimit };

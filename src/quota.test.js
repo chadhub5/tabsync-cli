@@ -1,75 +1,62 @@
-const { getModule } = (() => {
-  let mod;
-  return {
-    getModule: () => {
-      if (!mod) mod = require('./quota');
-      return mod;
-    }
-  };
-})();
-
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
-jest.mock('fs');
+let tmpDir;
+let mod;
 
-describe('quota', () => {
-  beforeEach(() => {
-    jest.resetModules();
-    fs.existsSync.mockReturnValue(true);
-    fs.readFileSync.mockReturnValue(JSON.stringify({
-      limits: { maxSessions: 100, maxTabsPerSession: 500, maxStorageMB: 50 },
-      usage: {}
-    }));
-    fs.writeFileSync.mockImplementation(() => {});
-    fs.mkdirSync.mockImplementation(() => {});
-  });
+function getModule() {
+  jest.resetModules();
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tabsync-quota-'));
+  process.env.HOME = tmpDir;
+  return require('./quota');
+}
 
-  test('getLimits returns current limits', () => {
-    const { getLimits } = require('./quota');
-    const limits = getLimits();
-    expect(limits.maxSessions).toBe(100);
-    expect(limits.maxTabsPerSession).toBe(500);
-    expect(limits.maxStorageMB).toBe(50);
-  });
+beforeEach(() => { mod = getModule(); });
+afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
-  test('setLimit updates a valid key', () => {
-    const { setLimit } = require('./quota');
-    const updated = setLimit('maxSessions', 200);
-    expect(updated.maxSessions).toBe(200);
-    expect(fs.writeFileSync).toHaveBeenCalled();
-  });
+test('ensureQuotaFile creates file', () => {
+  mod.ensureQuotaFile();
+  const file = path.join(tmpDir, '.tabsync', 'quota.json');
+  expect(fs.existsSync(file)).toBe(true);
+});
 
-  test('setLimit throws for unknown key', () => {
-    const { setLimit } = require('./quota');
-    expect(() => setLimit('unknownKey', 10)).toThrow('Unknown quota key: unknownKey');
-  });
+test('setLimit and getLimits', () => {
+  mod.setLimit('sessions', 100);
+  const limits = mod.getLimits();
+  expect(limits.sessions).toBe(100);
+});
 
-  test('checkQuota returns ok when under limit', () => {
-    const { checkQuota } = require('./quota');
-    const result = checkQuota('maxSessions', 50);
-    expect(result.ok).toBe(true);
-    expect(result.percent).toBe(50);
-  });
+test('updateUsage and getUsage', () => {
+  mod.updateUsage('sessions', 42);
+  const usage = mod.getUsage();
+  expect(usage.sessions).toBe(42);
+});
 
-  test('checkQuota returns not ok when at or over limit', () => {
-    const { checkQuota } = require('./quota');
-    const result = checkQuota('maxSessions', 100);
-    expect(result.ok).toBe(false);
-  });
+test('checkQuota allows when under limit', () => {
+  mod.setLimit('sessions', 10);
+  mod.updateUsage('sessions', 5);
+  const result = mod.checkQuota('sessions', 1);
+  expect(result.allowed).toBe(true);
+  expect(result.remaining).toBe(5);
+});
 
-  test('resetLimits restores defaults', () => {
-    const { resetLimits, DEFAULT_LIMITS } = require('./quota');
-    const limits = resetLimits();
-    expect(limits).toEqual(DEFAULT_LIMITS);
-    expect(fs.writeFileSync).toHaveBeenCalled();
-  });
+test('checkQuota denies when over limit', () => {
+  mod.setLimit('sessions', 10);
+  mod.updateUsage('sessions', 10);
+  const result = mod.checkQuota('sessions', 1);
+  expect(result.allowed).toBe(false);
+});
 
-  test('ensureQuotaFile creates file if missing', () => {
-    fs.existsSync.mockReturnValue(false);
-    const { ensureQuotaFile } = require('./quota');
-    ensureQuotaFile();
-    expect(fs.mkdirSync).toHaveBeenCalled();
-    expect(fs.writeFileSync).toHaveBeenCalled();
-  });
+test('checkQuota allows when no limit set', () => {
+  const result = mod.checkQuota('sessions');
+  expect(result.allowed).toBe(true);
+  expect(result.limit).toBeNull();
+});
+
+test('removeLimit deletes resource', () => {
+  mod.setLimit('tabs', 50);
+  mod.removeLimit('tabs');
+  const limits = mod.getLimits();
+  expect(limits.tabs).toBeUndefined();
 });
