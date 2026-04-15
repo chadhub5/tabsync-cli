@@ -3,6 +3,14 @@ const { loadSession, saveSession } = require('./session');
 /**
  * Merge two sessions by combining their tabs.
  * Duplicate URLs are removed based on strategy.
+ *
+ * @param {object} base - The base session object
+ * @param {object} incoming - The incoming session to merge from
+ * @param {string} strategy - Merge strategy: 'union' | 'replace' | 'intersect'
+ *   - union: keep all tabs from base, add new ones from incoming (default)
+ *   - replace: discard base tabs and use incoming tabs entirely
+ *   - intersect: keep only tabs that exist in both sessions
+ * @returns {object} A new merged session object
  */
 function mergeSessions(base, incoming, strategy = 'union') {
   if (!base || !Array.isArray(base.tabs)) throw new Error('Invalid base session');
