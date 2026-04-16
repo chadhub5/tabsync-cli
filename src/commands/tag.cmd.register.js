@@ -25,6 +25,7 @@ function registerTagCommands(program) {
     .command('list [tag]')
     .description('List sessions by tag, or list all tags if no tag given')
     .option('-q, --quiet', 'Suppress output')
+    .option('-j, --json', 'Output as JSON')
     .action((tagName, opts) => {
       handleTagList(tagName, opts);
     });
@@ -33,6 +34,7 @@ function registerTagCommands(program) {
     .command('show <session>')
     .description('Show all tags for a session')
     .option('-q, --quiet', 'Suppress output')
+    .option('-j, --json', 'Output as JSON')
     .action((session, opts) => {
       handleTagShow(session, opts);
     });
