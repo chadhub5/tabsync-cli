@@ -40,6 +40,12 @@ test('diffSessions summary contains correct counts', () => {
   expect(summary.commonCount).toBe(2);
 });
 
+test('diffSessions stores session names in summary', () => {
+  const { summary } = diffSessions('alpha', 'beta');
+  expect(summary.nameA).toBe('alpha');
+  expect(summary.nameB).toBe('beta');
+});
+
 test('diffSessions throws when session not found', () => {
   expect(() => diffSessions('missing', 'beta')).toThrow('Session not found: missing');
   expect(() => diffSessions('alpha', 'missing')).toThrow('Session not found: missing');
