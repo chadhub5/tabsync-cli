@@ -2,6 +2,11 @@ const { diffSessions, formatDiff } = require('../diff');
 
 /**
  * Handle the `diff <sessionA> <sessionB>` command
+ *
+ * @param {string} nameA - Name of the first session
+ * @param {string} nameB - Name of the second session
+ * @param {object} opts - Options object
+ * @param {boolean} opts.json - If true, output raw JSON instead of formatted text
  */
 async function handleDiff(nameA, nameB, opts = {}) {
   if (!nameA || !nameB) {
@@ -14,7 +19,11 @@ async function handleDiff(nameA, nameB, opts = {}) {
   try {
     diff = diffSessions(nameA, nameB);
   } catch (err) {
-    console.error(`Error: ${err.message}`);
+    if (err.code === 'SESSION_NOT_FOUND') {
+      console.error(`Error: Session not found — ${err.message}`);
+    } else {
+      console.error(`Error: ${err.message}`);
+    }
     process.exitCode = 1;
     return;
   }
